@@ -193,3 +193,10 @@ void db_tests()
         }
     }
 }
+
+db_backend& get_db()
+{
+    static db_backend bck("./prod_db", 1);
+
+    return bck;
+}

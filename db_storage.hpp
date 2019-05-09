@@ -29,6 +29,11 @@ struct db_tx
     db_tx(const db_backend& db, bool _read_only);
     ~db_tx();
 
+    db_tx(const db_tx&) = delete; // no copies
+    db_tx& operator=(const db_tx&) = delete; // no self-assignments
+    db_tx(db_tx&&) = delete; // WHY?
+    db_tx& operator=(db_tx&&) = delete; // WHY?
+
     MDB_txn* get();
 };
 
@@ -55,5 +60,7 @@ struct db_read_write
 };
 
 void db_tests();
+
+db_backend& get_db();
 
 #endif // DB_STORAGE_HPP_INCLUDED
