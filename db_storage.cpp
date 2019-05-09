@@ -30,6 +30,63 @@ std::vector<std::string> split(const std::string &s, char delim)
     return elems;
 }
 
+struct db_backend
+{
+    MDB_env* env = nullptr;
+    std::string storage;
+    int db_count = 0;
+
+    std::vector<MDB_dbi> dbis;
+
+    db_backend(const std::string& _storage, int _db_count) : storage(_storage), db_count(_db_count)
+    {
+        std::vector<std::string> dirs = split(storage, '/');
+
+        for(auto& i : dirs)
+        {
+            if(i == ".")
+                continue;
+
+            _mkdir(i.c_str());
+        }
+
+        CHECK_ASSERT(mdb_env_create(&env));
+
+        mdb_env_set_maxdbs(env, 50);
+
+        ///10000 MB
+        mdb_env_set_mapsize(env, 10485760ull * 10000ull);
+
+        CHECK_ASSERT(mdb_env_open(env, storage.c_str(), 0, 0));
+
+        dbis.resize(db_count);
+
+        for(int i=0; i < db_count; i++)
+        {
+            MDB_txn* transaction = nullptr;
+
+            CHECK_ASSERT(mdb_txn_begin(env, nullptr, 0, &transaction));
+
+            CHECK_ASSERT(mdb_dbi_open(transaction, std::to_string(i).c_str(), MDB_CREATE, &dbis[i]));
+
+            mdb_txn_commit(transaction);
+        }
+    }
+
+    ~db_backend()
+    {
+        mdb_env_close(env);
+    }
+
+    MDB_dbi get_db(int id) const
+    {
+        if(id < 0 || id >= (int)dbis.size())
+            throw std::runtime_error("Bad db id");
+
+        return dbis[id];
+    }
+};
+
 struct db_tx
 {
     MDB_txn* parent_transaction = nullptr;
@@ -37,9 +94,9 @@ struct db_tx
 
     bool read_only = false;
 
-    db_tx(MDB_env* env, bool _read_only) : read_only(_read_only)
+    db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
     {
-        CHECK_THROW(mdb_txn_begin(env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
+        CHECK_THROW(mdb_txn_begin(db.env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
     }
 
     ~db_tx()
@@ -120,7 +177,7 @@ struct db_read : db_tx
 {
     db_tx_read mread;
 
-    db_read(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, true), mread(_dbi) {}
+    db_read(const db_backend& db, int db_id) : db_tx(db, true), mread(db.get_db(db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
@@ -132,7 +189,7 @@ struct db_read_write : db_tx
 {
     db_tx_read_write mwrite;
 
-    db_read_write(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, false), mwrite(_dbi) {}
+    db_read_write(const db_backend& db, int db_id) : db_tx(db, false), mwrite(db.get_db(db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
@@ -150,64 +207,19 @@ struct db_read_write : db_tx
     }
 };
 
-struct db_backend
-{
-    MDB_env* env = nullptr;
-    std::string storage;
-    int db_count = 0;
-
-    std::vector<MDB_dbi> dbis;
-
-    db_backend(const std::string& _storage, int _db_count) : storage(_storage), db_count(_db_count)
-    {
-        std::vector<std::string> dirs = split(storage, '/');
-
-        for(auto& i : dirs)
-        {
-            if(i == ".")
-                continue;
-
-            _mkdir(i.c_str());
-        }
-
-        CHECK_ASSERT(mdb_env_create(&env));
-
-        mdb_env_set_maxdbs(env, 50);
-
-        ///10000 MB
-        mdb_env_set_mapsize(env, 10485760ull * 10000ull);
-
-        CHECK_ASSERT(mdb_env_open(env, storage.c_str(), 0, 0));
-
-        dbis.resize(db_count);
-
-        for(int i=0; i < db_count; i++)
-        {
-            db_tx tx(env, false);
-
-            CHECK_ASSERT(mdb_dbi_open(tx.get(), std::to_string(i).c_str(), MDB_CREATE, &dbis[i]));
-        }
-    }
-
-    ~db_backend()
-    {
-        mdb_env_close(env);
-    }
-};
-
 void db_tests()
 {
     db_backend simple_test("./test_db", 1);
 
     {
         {
-            db_read_write write_tx(simple_test.env, simple_test.dbis[0]);
+            db_read_write write_tx(simple_test, 0);
 
             write_tx.write("key_1", "mydataboy");
         }
 
         {
-            db_read read_tx(simple_test.env, simple_test.dbis[0]);
+            db_read read_tx(simple_test, 0);
 
             auto opt = read_tx.read("key_1");
 
