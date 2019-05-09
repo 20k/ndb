@@ -3,11 +3,13 @@
 #include <assert.h>
 #include <stdexcept>
 #include <vector>
+#include <string_view>
+#include <optional>
 
 struct db_tx
 {
     MDB_txn* parent_transaction = nullptr;
-    MDB_txn* transaction;
+    MDB_txn* transaction = nullptr;
 
     bool read_only = false;
 
@@ -37,14 +39,48 @@ struct db_tx
     }
 };
 
+struct db_data
+{
+    MDB_cursor* cursor = nullptr;
+    std::string_view data;
+
+    db_data(std::string_view _data, MDB_cursor* _cursor) : cursor(_cursor), data(_data){}
+    ~db_data(){mdb_cursor_close(cursor);}
+};
+
 struct db_read : db_tx
 {
-    db_read(MDB_env* env) : db_tx(env, true) {}
+    MDB_dbi dbi;
+
+    db_read(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, true), dbi(_dbi) {}
+
+    std::optional<db_data> read(std::string_view skey)
+    {
+        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
+
+        MDB_val data;
+
+        MDB_cursor* cursor = nullptr;
+
+        if(mdb_cursor_open(transaction, dbi, &cursor) != 0)
+            throw std::runtime_error("Bad Cursor");
+
+        if(mdb_cursor_get(cursor, &key, &data, MDB_SET_KEY) != 0)
+        {
+            mdb_cursor_close(cursor);
+
+            return std::nullopt;
+        }
+
+        return db_data({(const char*)data.mv_data, data.mv_size}, cursor);
+    }
 };
 
 struct db_read_write : db_tx
 {
-    db_read_write(MDB_env* env) : db_tx(env, false) {}
+    MDB_dbi dbi;
+
+    db_read_write(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, false), dbi(_dbi) {}
 };
 
 struct db_backend
@@ -62,7 +98,7 @@ struct db_backend
         mdb_env_set_maxdbs(env, 50);
 
         ///10000 MB
-        mdb_env_set_mapsize(env, 1024ull * 1024ull * 10000ull);
+        mdb_env_set_mapsize(env, 10485760ull * 10000ull);
 
         assert(mdb_env_open(env, storage.c_str(), 0, 0) == 0);
 
@@ -70,7 +106,7 @@ struct db_backend
 
         for(int i=0; i < db_count; i++)
         {
-            db_read_write tx(env);
+            db_tx tx(env, false);
 
             assert(mdb_dbi_open(tx.get(), std::to_string(i).c_str(), MDB_CREATE, &dbis[i]) == 0);
         }
