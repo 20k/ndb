@@ -8,6 +8,9 @@
 #include <sstream>
 #include <direct.h>
 
+#define CHECK_THROW(x) if(const int rc = x) { throw std::runtime_error("DB Error " + std::to_string(rc));}
+#define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s" + rc, #x); assert(false && #x);}
+
 inline
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems)
 {
@@ -36,8 +39,7 @@ struct db_tx
 
     db_tx(MDB_env* env, bool _read_only) : read_only(_read_only)
     {
-        if(const int rc = mdb_txn_begin(env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction) != 0)
-            throw std::runtime_error("Bad Transaction (db_storage.cpp)");
+        CHECK_THROW(mdb_txn_begin(env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
     }
 
     ~db_tx()
@@ -81,8 +83,7 @@ struct db_tx_read
 
         MDB_cursor* cursor = nullptr;
 
-        if(mdb_cursor_open(tx.transaction, dbi, &cursor) != 0)
-            throw std::runtime_error("Bad Cursor");
+        CHECK_THROW(mdb_cursor_open(tx.transaction, dbi, &cursor));
 
         if(mdb_cursor_get(cursor, &key, &data, MDB_SET_KEY) != 0)
         {
@@ -104,16 +105,14 @@ struct db_tx_read_write : db_tx_read
         MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
         MDB_val data = {sdata.size(), const_cast<void*>((const void*)sdata.data())};
 
-        if(mdb_put(tx.transaction, dbi, &key, &data, 0) != 0)
-            throw std::runtime_error("Write error");
+        CHECK_THROW(mdb_put(tx.transaction, dbi, &key, &data, 0));
     }
 
     void del_tx(const db_tx& tx, std::string_view skey)
     {
         MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
 
-        if(mdb_del(tx.transaction, dbi, &key, nullptr) != 0)
-            throw std::runtime_error("Failed to delete");
+        CHECK_THROW(mdb_del(tx.transaction, dbi, &key, nullptr));
     }
 };
 
@@ -171,14 +170,14 @@ struct db_backend
             _mkdir(i.c_str());
         }
 
-        assert(mdb_env_create(&env) == 0);
+        CHECK_ASSERT(mdb_env_create(&env));
 
         mdb_env_set_maxdbs(env, 50);
 
         ///10000 MB
         mdb_env_set_mapsize(env, 10485760ull * 10000ull);
 
-        assert(mdb_env_open(env, storage.c_str(), 0, 0) != 0);
+        CHECK_ASSERT(mdb_env_open(env, storage.c_str(), 0, 0));
 
         dbis.resize(db_count);
 
@@ -186,7 +185,7 @@ struct db_backend
         {
             db_tx tx(env, false);
 
-            assert(mdb_dbi_open(tx.get(), std::to_string(i).c_str(), MDB_CREATE, &dbis[i]) == 0);
+            CHECK_ASSERT(mdb_dbi_open(tx.get(), std::to_string(i).c_str(), MDB_CREATE, &dbis[i]));
         }
     }
 
