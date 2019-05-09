@@ -126,86 +126,76 @@ struct db_data
     ~db_data(){mdb_cursor_close(cursor);}
 };
 
-struct db_tx_read
+std::optional<db_data> read_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
 {
-    MDB_dbi dbi;
+    MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
 
-    db_tx_read(MDB_dbi _dbi) : dbi(_dbi){}
+    MDB_val data;
 
-    std::optional<db_data> read_tx(const db_tx& tx, std::string_view skey)
+    MDB_cursor* cursor = nullptr;
+
+    CHECK_THROW(mdb_cursor_open(tx.transaction, dbi, &cursor));
+
+    if(mdb_cursor_get(cursor, &key, &data, MDB_SET_KEY) != 0)
     {
-        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
+        mdb_cursor_close(cursor);
 
-        MDB_val data;
-
-        MDB_cursor* cursor = nullptr;
-
-        CHECK_THROW(mdb_cursor_open(tx.transaction, dbi, &cursor));
-
-        if(mdb_cursor_get(cursor, &key, &data, MDB_SET_KEY) != 0)
-        {
-            mdb_cursor_close(cursor);
-
-            return std::nullopt;
-        }
-
-        return db_data({(const char*)data.mv_data, data.mv_size}, cursor);
+        return std::nullopt;
     }
-};
 
-struct db_tx_read_write : db_tx_read
+    return db_data({(const char*)data.mv_data, data.mv_size}, cursor);
+}
+
+void write_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey, std::string_view sdata)
 {
-    db_tx_read_write(MDB_dbi _dbi) : db_tx_read(_dbi){}
+    MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
+    MDB_val data = {sdata.size(), const_cast<void*>((const void*)sdata.data())};
 
-    void write_tx(const db_tx& tx, std::string_view skey, std::string_view sdata)
-    {
-        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
-        MDB_val data = {sdata.size(), const_cast<void*>((const void*)sdata.data())};
+    CHECK_THROW(mdb_put(tx.transaction, dbi, &key, &data, 0));
+}
 
-        CHECK_THROW(mdb_put(tx.transaction, dbi, &key, &data, 0));
-    }
+void del_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
+{
+    MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
 
-    void del_tx(const db_tx& tx, std::string_view skey)
-    {
-        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
-
-        CHECK_THROW(mdb_del(tx.transaction, dbi, &key, nullptr));
-    }
-};
+    CHECK_THROW(mdb_del(tx.transaction, dbi, &key, nullptr));
+}
 
 struct db_read
 {
     db_tx dtx;
-    db_tx_read mread;
+    //db_tx_read mread;
+    MDB_dbi dbid;
 
-    db_read(const db_backend& db, int db_id) : dtx(db, true), mread(db.get_db(db_id)) {}
+    db_read(const db_backend& db, int _db_id) : dtx(db, true), dbid(db.get_db(_db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
-        return mread.read_tx(dtx, skey);
+        return read_tx(dbid, dtx, skey);
     }
 };
 
 struct db_read_write
 {
     db_tx dtx;
-    db_tx_read_write mwrite;
+    //db_tx_read_write mwrite;
+    MDB_dbi dbid;
 
-    db_read_write(const db_backend& db, int db_id) : dtx(db, false), mwrite(db.get_db(db_id)) {}
+    db_read_write(const db_backend& db, int _db_id) : dtx(db, false), dbid(db.get_db(_db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
-        return mwrite.read_tx(dtx, skey);
+        return read_tx(dbid, dtx, skey);
     }
 
     void write(std::string_view skey, std::string_view sdata)
     {
-        return mwrite.write_tx(dtx, skey, sdata);
+        return write_tx(dbid, dtx, skey, sdata);
     }
 
     void del(std::string_view skey)
     {
-        return mwrite.del_tx(dtx, skey);
+        return del_tx(dbid, dtx, skey);
     }
 };
 
