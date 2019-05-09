@@ -94,35 +94,47 @@ MDB_txn*& get_parent_transaction()
     return parent;
 }
 
+bool& db_abort_in_flight()
+{
+    static thread_local bool db_abort;
+
+    return db_abort;
+}
+
+db_exception::db_exception()
+{
+    db_abort_in_flight() = true;
+}
+
+db_exception::~db_exception()
+{
+    db_abort_in_flight() = false;
+}
+
 db_tx::db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
 {
     MDB_txn*& parent = get_parent_transaction();
 
     CHECK_THROW(mdb_txn_begin(db.env, parent, read_only ? MDB_RDONLY : 0, &transaction));
 
-    if(parent == nullptr)
-    {
-        parent = transaction;
-    }
+    last_parent_transaction = parent;
+    parent = transaction;
 }
 
 db_tx::~db_tx()
 {
-    if(read_only)
+    if(db_abort_in_flight())
     {
         mdb_txn_abort(transaction);
     }
     else
     {
-        mdb_txn_commit(transaction);
+        CHECK_ASSERT(mdb_txn_commit(transaction));
     }
 
     MDB_txn*& parent = get_parent_transaction();
 
-    if(parent == transaction)
-    {
-        parent = nullptr;
-    }
+    parent = last_parent_transaction;
 }
 
 MDB_txn* db_tx::get()

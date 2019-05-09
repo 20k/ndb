@@ -11,7 +11,20 @@ typedef struct MDB_cursor MDB_cursor;
 struct db_backend;
 
 ///so, lmdb will abort committed children if you abort their parent transaction
-///
+///if I can find some way to throw a special exception that aborts ongoing transactions
+///rather than having to cancel them manually, might save me a LOT of error checking
+
+struct db_exception : public std::exception
+{
+    db_exception();
+    ~db_exception();
+
+    const char* what() const noexcept
+    {
+        return "Db Exception";
+    }
+
+};
 
 struct db_data
 {
@@ -24,7 +37,7 @@ struct db_data
 
 struct db_tx
 {
-    MDB_txn* parent_transaction = nullptr;
+    MDB_txn* last_parent_transaction = nullptr;
     MDB_txn* transaction = nullptr;
 
     bool read_only = false;
