@@ -86,9 +86,15 @@ struct db_tx_read_write : db_tx_read
         MDB_val data = {sdata.size(), const_cast<void*>((const void*)sdata.data())};
 
         if(mdb_put(tx.transaction, dbi, &key, &data, 0) != 0)
-        {
             throw std::runtime_error("Write error");
-        }
+    }
+
+    void del_tx(const db_tx& tx, std::string_view skey)
+    {
+        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
+
+        if(mdb_del(tx.transaction, dbi, &key, nullptr) != 0)
+            throw std::runtime_error("Failed to delete");
     }
 };
 
@@ -110,9 +116,19 @@ struct db_read_write : db_tx
 
     db_read_write(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, false), mwrite(_dbi) {}
 
+    std::optional<db_data> read(std::string_view skey)
+    {
+        return mwrite.read_tx(*this, skey);
+    }
+
     void write(std::string_view skey, std::string_view sdata)
     {
         return mwrite.write_tx(*this, skey, sdata);
+    }
+
+    void del(std::string_view skey)
+    {
+        return mwrite.del_tx(*this, skey);
     }
 };
 
