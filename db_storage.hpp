@@ -1,0 +1,6 @@
+#ifndef DB_STORAGE_HPP_INCLUDED
+#define DB_STORAGE_HPP_INCLUDED
+
+void db_tests();
+
+#endif // DB_STORAGE_HPP_INCLUDED
