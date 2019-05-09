@@ -87,10 +87,23 @@ struct db_backend
     }
 };
 
+MDB_txn*& get_parent_transaction()
+{
+    static thread_local MDB_txn* parent = nullptr;
+
+    return parent;
+}
 
 db_tx::db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
 {
-    CHECK_THROW(mdb_txn_begin(db.env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
+    MDB_txn*& parent = get_parent_transaction();
+
+    CHECK_THROW(mdb_txn_begin(db.env, parent, read_only ? MDB_RDONLY : 0, &transaction));
+
+    if(parent == nullptr)
+    {
+        parent = transaction;
+    }
 }
 
 db_tx::~db_tx()
@@ -102,6 +115,13 @@ db_tx::~db_tx()
     else
     {
         mdb_txn_commit(transaction);
+    }
+
+    MDB_txn*& parent = get_parent_transaction();
+
+    if(parent == transaction)
+    {
+        parent = nullptr;
     }
 }
 
@@ -192,6 +212,8 @@ void db_tests()
             assert(opt.has_value() && opt.value().data == "mydataboy");
         }
     }
+
+    printf("Tests success");
 }
 
 db_backend& get_db()
