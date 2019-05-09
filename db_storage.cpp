@@ -48,13 +48,13 @@ struct db_data
     ~db_data(){mdb_cursor_close(cursor);}
 };
 
-struct db_read : db_tx
+struct db_tx_read
 {
     MDB_dbi dbi;
 
-    db_read(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, true), dbi(_dbi) {}
+    db_tx_read(MDB_dbi _dbi) : dbi(_dbi){}
 
-    std::optional<db_data> read(std::string_view skey)
+    std::optional<db_data> read_tx(const db_tx& tx, std::string_view skey)
     {
         MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
 
@@ -62,7 +62,7 @@ struct db_read : db_tx
 
         MDB_cursor* cursor = nullptr;
 
-        if(mdb_cursor_open(transaction, dbi, &cursor) != 0)
+        if(mdb_cursor_open(tx.transaction, dbi, &cursor) != 0)
             throw std::runtime_error("Bad Cursor");
 
         if(mdb_cursor_get(cursor, &key, &data, MDB_SET_KEY) != 0)
@@ -76,11 +76,44 @@ struct db_read : db_tx
     }
 };
 
+struct db_tx_read_write : db_tx_read
+{
+    db_tx_read_write(MDB_dbi _dbi) : db_tx_read(_dbi){}
+
+    void write_tx(const db_tx& tx, std::string_view skey, std::string_view sdata)
+    {
+        MDB_val key = {skey.size(), const_cast<void*>((const void*)skey.data())};
+        MDB_val data = {sdata.size(), const_cast<void*>((const void*)sdata.data())};
+
+        if(mdb_put(tx.transaction, dbi, &key, &data, 0) != 0)
+        {
+            throw std::runtime_error("Write error");
+        }
+    }
+};
+
+struct db_read : db_tx
+{
+    db_tx_read mread;
+
+    db_read(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, true), mread(_dbi) {}
+
+    std::optional<db_data> read(std::string_view skey)
+    {
+        return mread.read_tx(*this, skey);
+    }
+};
+
 struct db_read_write : db_tx
 {
-    MDB_dbi dbi;
+    db_tx_read_write mwrite;
 
-    db_read_write(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, false), dbi(_dbi) {}
+    db_read_write(MDB_env* _env, MDB_dbi _dbi) : db_tx(_env, false), mwrite(_dbi) {}
+
+    void write(std::string_view skey, std::string_view sdata)
+    {
+        return mwrite.write_tx(*this, skey, sdata);
+    }
 };
 
 struct db_backend
