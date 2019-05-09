@@ -10,6 +10,9 @@ typedef struct MDB_cursor MDB_cursor;
 
 struct db_backend;
 
+///so, lmdb will abort committed children if you abort their parent transaction
+///
+
 struct db_data
 {
     MDB_cursor* cursor = nullptr;
