@@ -173,37 +173,39 @@ struct db_tx_read_write : db_tx_read
     }
 };
 
-struct db_read : db_tx
+struct db_read
 {
+    db_tx dtx;
     db_tx_read mread;
 
-    db_read(const db_backend& db, int db_id) : db_tx(db, true), mread(db.get_db(db_id)) {}
+    db_read(const db_backend& db, int db_id) : dtx(db, true), mread(db.get_db(db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
-        return mread.read_tx(*this, skey);
+        return mread.read_tx(dtx, skey);
     }
 };
 
-struct db_read_write : db_tx
+struct db_read_write
 {
+    db_tx dtx;
     db_tx_read_write mwrite;
 
-    db_read_write(const db_backend& db, int db_id) : db_tx(db, false), mwrite(db.get_db(db_id)) {}
+    db_read_write(const db_backend& db, int db_id) : dtx(db, false), mwrite(db.get_db(db_id)) {}
 
     std::optional<db_data> read(std::string_view skey)
     {
-        return mwrite.read_tx(*this, skey);
+        return mwrite.read_tx(dtx, skey);
     }
 
     void write(std::string_view skey, std::string_view sdata)
     {
-        return mwrite.write_tx(*this, skey, sdata);
+        return mwrite.write_tx(dtx, skey, sdata);
     }
 
     void del(std::string_view skey)
     {
-        return mwrite.del_tx(*this, skey);
+        return mwrite.del_tx(dtx, skey);
     }
 };
 
