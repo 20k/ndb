@@ -23,7 +23,6 @@ struct db_exception : public std::exception
     {
         return "Db Exception";
     }
-
 };
 
 struct db_data
