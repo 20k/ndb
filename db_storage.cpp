@@ -1,10 +1,31 @@
 #include "db_storage.hpp"
-#include <lmdb.h>
+#include <liblmdb/lmdb.h>
 #include <assert.h>
 #include <stdexcept>
 #include <vector>
 #include <string_view>
 #include <optional>
+#include <sstream>
+#include <direct.h>
+
+inline
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems)
+{
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+
+inline
+std::vector<std::string> split(const std::string &s, char delim)
+{
+    std::vector<std::string> elems;
+    split(s, delim, elems);
+    return elems;
+}
 
 struct db_tx
 {
@@ -16,9 +37,7 @@ struct db_tx
     db_tx(MDB_env* env, bool _read_only) : read_only(_read_only)
     {
         if(const int rc = mdb_txn_begin(env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction) != 0)
-        {
             throw std::runtime_error("Bad Transaction (db_storage.cpp)");
-        }
     }
 
     ~db_tx()
@@ -142,6 +161,16 @@ struct db_backend
 
     db_backend(const std::string& _storage, int _db_count) : storage(_storage), db_count(_db_count)
     {
+        std::vector<std::string> dirs = split(storage, '/');
+
+        for(auto& i : dirs)
+        {
+            if(i == ".")
+                continue;
+
+            _mkdir(i.c_str());
+        }
+
         assert(mdb_env_create(&env) == 0);
 
         mdb_env_set_maxdbs(env, 50);
@@ -149,7 +178,7 @@ struct db_backend
         ///10000 MB
         mdb_env_set_mapsize(env, 10485760ull * 10000ull);
 
-        assert(mdb_env_open(env, storage.c_str(), 0, 0) == 0);
+        assert(mdb_env_open(env, storage.c_str(), 0, 0) != 0);
 
         dbis.resize(db_count);
 
@@ -169,5 +198,21 @@ struct db_backend
 
 void db_tests()
 {
+    db_backend simple_test("./test_db", 1);
 
+    {
+        {
+            db_read_write write_tx(simple_test.env, simple_test.dbis[0]);
+
+            write_tx.write("key_1", "mydataboy");
+        }
+
+        {
+            db_read read_tx(simple_test.env, simple_test.dbis[0]);
+
+            auto opt = read_tx.read("key_1");
+
+            assert(opt.has_value() && opt.value().data == "mydataboy");
+        }
+    }
 }
