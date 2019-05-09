@@ -7,8 +7,9 @@
 #include <optional>
 #include <sstream>
 #include <direct.h>
+#include <iostream>
 
-#define CHECK_THROW(x) if(const int rc = x) { throw std::runtime_error("DB Error " + std::to_string(rc));}
+#define CHECK_THROW(x) if(const int rc = x) { std::cout << rc << std::endl; throw std::runtime_error("DB Error " + std::to_string(rc));}
 #define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s" + rc, #x); assert(false && #x);}
 
 inline
@@ -75,6 +76,11 @@ struct db_backend
 
     ~db_backend()
     {
+        for(int i=0; i < (int)dbis.size(); i++)
+        {
+            mdb_dbi_close(env, dbis[i]);
+        }
+
         mdb_env_close(env);
     }
 
@@ -115,7 +121,7 @@ db_tx::db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
 {
     MDB_txn*& parent = get_parent_transaction();
 
-    CHECK_THROW(mdb_txn_begin(db.env, parent, read_only ? MDB_RDONLY : 0, &transaction));
+    CHECK_THROW(mdb_txn_begin(db.env, nullptr, read_only ? MDB_RDONLY : 0, &transaction));
 
     last_parent_transaction = parent;
     parent = transaction;
@@ -224,6 +230,20 @@ void db_tests()
             assert(opt.has_value() && opt.value().data == "mydataboy");
         }
     }
+
+    /*
+    ///test parent_txns
+    {
+        db_read write_tx(simple_test, 0);
+
+        write_tx.write("key_2", "somedatahere");
+
+        db_read read_tx(simple_test, 0);
+
+        auto opt = read_tx.read("key_2");
+
+        assert(opt.has_value());
+    }*/
 
     printf("Tests success");
 }
