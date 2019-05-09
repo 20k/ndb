@@ -87,44 +87,32 @@ struct db_backend
     }
 };
 
-struct db_tx
+
+db_tx::db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
 {
-    MDB_txn* parent_transaction = nullptr;
-    MDB_txn* transaction = nullptr;
+    CHECK_THROW(mdb_txn_begin(db.env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
+}
 
-    bool read_only = false;
-
-    db_tx(const db_backend& db, bool _read_only) : read_only(_read_only)
-    {
-        CHECK_THROW(mdb_txn_begin(db.env, parent_transaction, read_only ? MDB_RDONLY : 0, &transaction));
-    }
-
-    ~db_tx()
-    {
-        if(read_only)
-        {
-            mdb_txn_abort(transaction);
-        }
-        else
-        {
-            mdb_txn_commit(transaction);
-        }
-    }
-
-    MDB_txn* get()
-    {
-        return transaction;
-    }
-};
-
-struct db_data
+db_tx::~db_tx()
 {
-    MDB_cursor* cursor = nullptr;
-    std::string_view data;
+    if(read_only)
+    {
+        mdb_txn_abort(transaction);
+    }
+    else
+    {
+        mdb_txn_commit(transaction);
+    }
+}
 
-    db_data(std::string_view _data, MDB_cursor* _cursor) : cursor(_cursor), data(_data){}
-    ~db_data(){mdb_cursor_close(cursor);}
-};
+MDB_txn* db_tx::get()
+{
+    return transaction;
+}
+
+db_data::db_data(std::string_view _data, MDB_cursor* _cursor) : cursor(_cursor), data(_data){}
+
+db_data::~db_data(){mdb_cursor_close(cursor);}
 
 std::optional<db_data> read_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
 {
@@ -161,43 +149,29 @@ void del_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
     CHECK_THROW(mdb_del(tx.transaction, dbi, &key, nullptr));
 }
 
-struct db_read
+db_read::db_read(const db_backend& db, int _db_id) : dtx(db, true), dbid(db.get_db(_db_id)) {}
+
+std::optional<db_data> db_read::read(std::string_view skey)
 {
-    db_tx dtx;
-    //db_tx_read mread;
-    MDB_dbi dbid;
+    return read_tx(dbid, dtx, skey);
+}
 
-    db_read(const db_backend& db, int _db_id) : dtx(db, true), dbid(db.get_db(_db_id)) {}
+db_read_write::db_read_write(const db_backend& db, int _db_id) : dtx(db, false), dbid(db.get_db(_db_id)) {}
 
-    std::optional<db_data> read(std::string_view skey)
-    {
-        return read_tx(dbid, dtx, skey);
-    }
-};
-
-struct db_read_write
+std::optional<db_data> db_read_write::read(std::string_view skey)
 {
-    db_tx dtx;
-    //db_tx_read_write mwrite;
-    MDB_dbi dbid;
+    return read_tx(dbid, dtx, skey);
+}
 
-    db_read_write(const db_backend& db, int _db_id) : dtx(db, false), dbid(db.get_db(_db_id)) {}
+void db_read_write::write(std::string_view skey, std::string_view sdata)
+{
+    return write_tx(dbid, dtx, skey, sdata);
+}
 
-    std::optional<db_data> read(std::string_view skey)
-    {
-        return read_tx(dbid, dtx, skey);
-    }
-
-    void write(std::string_view skey, std::string_view sdata)
-    {
-        return write_tx(dbid, dtx, skey, sdata);
-    }
-
-    void del(std::string_view skey)
-    {
-        return del_tx(dbid, dtx, skey);
-    }
-};
+void db_read_write::del(std::string_view skey)
+{
+    return del_tx(dbid, dtx, skey);
+}
 
 void db_tests()
 {
