@@ -54,7 +54,6 @@ struct db_read_write
     void del(std::string_view skey);
 };
 
-
 void db_tests();
 
 #endif // DB_STORAGE_HPP_INCLUDED
