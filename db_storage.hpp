@@ -30,6 +30,11 @@ struct db_data
     MDB_cursor* cursor = nullptr;
     std::string_view data;
 
+    db_data(const db_data&) = delete;
+    db_data& operator=(const db_data&) = delete;
+    db_data& operator=(db_data&&) = delete;
+
+    db_data(db_data&&);
     db_data(std::string_view _data, MDB_cursor* _cursor);
     ~db_data();
 };
@@ -44,10 +49,10 @@ struct db_tx
     db_tx(const db_backend& db, bool _read_only);
     ~db_tx();
 
-    db_tx(const db_tx&) = delete; // no copies
-    db_tx& operator=(const db_tx&) = delete; // no self-assignments
-    db_tx(db_tx&&) = delete; // WHY?
-    db_tx& operator=(db_tx&&) = delete; // WHY?
+    db_tx(const db_tx&) = delete;
+    db_tx& operator=(const db_tx&) = delete;
+    db_tx(db_tx&&) = delete;
+    db_tx& operator=(db_tx&&) = delete;
 
     MDB_txn* get();
 };

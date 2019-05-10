@@ -153,7 +153,21 @@ MDB_txn* db_tx::get()
 
 db_data::db_data(std::string_view _data, MDB_cursor* _cursor) : cursor(_cursor), data(_data){}
 
-db_data::~db_data(){mdb_cursor_close(cursor);}
+db_data::db_data(db_data&& other)
+{
+    data = other.data;
+    cursor = other.cursor;
+
+    other.cursor = nullptr;
+}
+
+db_data::~db_data()
+{
+    if(cursor == nullptr)
+        return;
+
+    mdb_cursor_close(cursor);
+}
 
 std::optional<db_data> read_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
 {
