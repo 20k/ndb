@@ -9,6 +9,9 @@
 #include <direct.h>
 #include <iostream>
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 #define CHECK_THROW(x) if(const int rc = x) { std::cout << rc << std::endl; throw std::runtime_error("DB Error " + std::to_string(rc));}
 #define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s" + rc, #x); assert(false && #x);}
 
@@ -211,23 +214,63 @@ void db_read_write::del(std::string_view skey)
     return del_tx(dbid, dtx, skey);
 }
 
+struct dtime
+{
+    LARGE_INTEGER freq;
+    LARGE_INTEGER start;
+
+    dtime()
+    {
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&start);
+    }
+
+    ~dtime()
+    {
+        LARGE_INTEGER fin;
+
+        QueryPerformanceCounter(&fin);
+
+        size_t diff = fin.QuadPart - start.QuadPart;
+
+        std::cout << "Timer ms " << (double)diff / ((double)freq.QuadPart / 1000.) << std::endl;
+    }
+};
+
 void db_tests()
 {
-    db_backend simple_test("./test_db", 1);
+    db_backend simple_test("./test_db", 2);
 
     {
         {
+            dtime tm;
+
             db_read_write write_tx(simple_test, 0);
 
             write_tx.write("key_1", "mydataboy");
         }
 
         {
+            dtime tm;
+
             db_read read_tx(simple_test, 0);
 
             auto opt = read_tx.read("key_1");
 
             assert(opt.has_value() && opt.value().data == "mydataboy");
+        }
+    }
+
+    {
+        {
+            dtime tm;
+
+            db_read_write write_tx(simple_test, 1);
+
+            for(int i=0; i < 1000*1000; i++)
+            {
+                write_tx.write(std::to_string(i), "dfdf");
+            }
         }
     }
 
