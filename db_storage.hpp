@@ -14,6 +14,10 @@ struct db_backend;
 ///if I can find some way to throw a special exception that aborts ongoing transactions
 ///rather than having to cancel them manually, might save me a LOT of error checking
 
+///parent/child transactions are hard to get right. It only works for write transactions
+///which means that if i'm in a read and then I commit a write child, i'd have to abort the parent read
+///create a new tx for the parent, child my write to that, and then make all children write transactions
+
 struct db_exception : public std::exception
 {
     db_exception();
