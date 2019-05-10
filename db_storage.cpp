@@ -273,6 +273,18 @@ void db_tests()
 
             assert(opt.has_value() && opt.value().data == "mydataboy");
         }
+
+        {
+            db_read_write write_tx(simple_test, 0);
+
+            write_tx.del("key_1");
+        }
+
+        {
+            db_read read_tx(simple_test, 0);
+
+            assert(!read_tx.read("key_1").has_value());
+        }
     }
 
     {
