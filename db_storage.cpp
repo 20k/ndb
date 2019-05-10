@@ -44,7 +44,7 @@ struct db_backend
 
     db_backend(const std::string& _storage, int _db_count) : storage(_storage), db_count(_db_count)
     {
-        std::vector<std::string> dirs = split(storage, '/');
+        /*std::vector<std::string> dirs = split(storage, '/');
 
         for(auto& i : dirs)
         {
@@ -52,7 +52,7 @@ struct db_backend
                 continue;
 
             _mkdir(i.c_str());
-        }
+        }*/
 
         CHECK_ASSERT(mdb_env_create(&env));
 
