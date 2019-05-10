@@ -6,11 +6,12 @@
 #include <string_view>
 #include <optional>
 #include <sstream>
-#include <direct.h>
 #include <iostream>
 
+#ifdef PERF
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#endif // PERF
 
 #define CHECK_THROW(x) if(const int rc = x) { std::cout << rc << std::endl; throw std::runtime_error("DB Error " + std::to_string(rc));}
 #define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s" + rc, #x); assert(false && #x);}
@@ -230,17 +231,22 @@ void db_read_write::del(std::string_view skey)
 
 struct dtime
 {
+    #ifdef PERF
     LARGE_INTEGER freq;
     LARGE_INTEGER start;
+    #endif // PERF
 
     dtime()
     {
+        #ifdef PERF
         QueryPerformanceFrequency(&freq);
         QueryPerformanceCounter(&start);
+        #endif // PERF
     }
 
     ~dtime()
     {
+        #ifdef PERF
         LARGE_INTEGER fin;
 
         QueryPerformanceCounter(&fin);
@@ -248,6 +254,7 @@ struct dtime
         size_t diff = fin.QuadPart - start.QuadPart;
 
         std::cout << "Timer ms " << (double)diff / ((double)freq.QuadPart / 1000.) << std::endl;
+        #endif // PERF
     }
 };
 
