@@ -17,6 +17,9 @@ struct db_backend;
 ///parent/child transactions are hard to get right. It only works for write transactions
 ///which means that if i'm in a read and then I commit a write child, i'd have to abort the parent read
 ///create a new tx for the parent, child my write to that, and then make all children write transactions
+///additionally each transaction can only have one child, so would need to basically create a linked list of transactions
+///not 100% sure what it'd be like for perf because might end up with very long transaction chains
+///(due to using as fine a grain of transactions as possible)
 
 struct db_exception : public std::exception
 {
