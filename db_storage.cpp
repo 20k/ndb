@@ -73,7 +73,7 @@ struct db_backend
 
             CHECK_ASSERT(mdb_dbi_open(transaction, std::to_string(i).c_str(), MDB_CREATE, &dbis[i]));
 
-            mdb_txn_commit(transaction);
+            CHECK_ASSERT(mdb_txn_commit(transaction));
         }
     }
 
