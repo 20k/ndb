@@ -1,5 +1,5 @@
 #include "db_storage.hpp"
-#include <liblmdb/lmdb.h>
+#include <lmdb.h>
 #include <assert.h>
 #include <stdexcept>
 #include <vector>

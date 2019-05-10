@@ -33,7 +33,12 @@
 			<Add option="-std=c++17" />
 			<Add option="-fexceptions" />
 			<Add directory="deps" />
+			<Add directory="deps/liblmdb" />
 		</Compiler>
+		<Linker>
+			<Add option="-llmdb" />
+			<Add directory="deps/liblmdb" />
+		</Linker>
 		<Unit filename="db_storage.cpp" />
 		<Unit filename="db_storage.hpp" />
 		<Unit filename="main.cpp" />
