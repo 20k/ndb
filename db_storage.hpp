@@ -81,6 +81,7 @@ struct db_read_write
 
 void db_tests();
 
+void set_num_dbs(int num);
 db_backend& get_db();
 
 #endif // DB_STORAGE_HPP_INCLUDED

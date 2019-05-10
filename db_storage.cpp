@@ -317,9 +317,21 @@ void db_tests()
     printf("Tests success");
 }
 
+int& get_num_dbs()
+{
+    static int num = 1;
+
+    return num;
+}
+
+void set_num_dbs(int num)
+{
+    get_num_dbs() = num;
+}
+
 db_backend& get_db()
 {
-    static db_backend bck("./prod_db", 1);
+    static db_backend bck("./prod_db", get_num_dbs());
 
     return bck;
 }
