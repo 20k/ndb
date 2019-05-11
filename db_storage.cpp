@@ -256,7 +256,7 @@ struct dtime
 
 void db_tests()
 {
-    db_backend simple_test("./test_db", 2);
+    db_backend simple_test("./test_db", 3);
 
     {
         {
@@ -300,6 +300,27 @@ void db_tests()
             {
                 write_tx.write(std::to_string(i), "dfdf");
             }
+        }
+    }
+
+    ///check db polymorphism
+    {
+        dtime tm;
+
+        {
+            db_read_write write_tx(simple_test, 2);
+
+            write_tx.write("test_key", "1234");
+        }
+
+        {
+            db_read_write read_tx(simple_test, 2);
+
+            db_read& poly = read_tx;
+
+            auto opt = poly.read("test_key");
+
+            assert(opt.has_value() && opt.value().data == "1234");
         }
     }
 
