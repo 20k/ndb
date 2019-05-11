@@ -74,6 +74,7 @@ struct db_read
     std::optional<db_data> read(std::string_view skey);
 };
 
+///this needs to inherit from db_read so we can use it polymorphically
 struct db_read_write
 {
     db_tx dtx;
