@@ -70,19 +70,16 @@ struct db_read
     MDB_dbi dbid;
 
     db_read(const db_backend& db, int _db_id);
+    db_read(const db_backend& db, int _db_id, bool is_read_only); ///HACK
 
     std::optional<db_data> read(std::string_view skey);
 };
 
 ///this needs to inherit from db_read so we can use it polymorphically
-struct db_read_write
+struct db_read_write : db_read
 {
-    db_tx dtx;
-    MDB_dbi dbid;
-
     db_read_write(const db_backend& db, int _db_id);
 
-    std::optional<db_data> read(std::string_view skey);
     void write(std::string_view skey, std::string_view sdata);
     void del(std::string_view skey);
 };

@@ -206,18 +206,14 @@ void del_tx(MDB_dbi dbi, const db_tx& tx, std::string_view skey)
 }
 
 db_read::db_read(const db_backend& db, int _db_id) : dtx(db, true), dbid(db.get_db(_db_id)) {}
+db_read::db_read(const db_backend& db, int _db_id, bool is_read_only) : dtx(db, is_read_only), dbid(db.get_db(_db_id)) {}
 
 std::optional<db_data> db_read::read(std::string_view skey)
 {
     return read_tx(dbid, dtx, skey);
 }
 
-db_read_write::db_read_write(const db_backend& db, int _db_id) : dtx(db, false), dbid(db.get_db(_db_id)) {}
-
-std::optional<db_data> db_read_write::read(std::string_view skey)
-{
-    return read_tx(dbid, dtx, skey);
-}
+db_read_write::db_read_write(const db_backend& db, int _db_id) : db_read(db, _db_id, false) {}
 
 void db_read_write::write(std::string_view skey, std::string_view sdata)
 {
