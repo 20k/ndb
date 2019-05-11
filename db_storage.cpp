@@ -14,7 +14,7 @@
 #endif // PERF
 
 #define CHECK_THROW(x) if(const int rc = x) { std::cout << rc << std::endl; throw std::runtime_error("DB Error " + std::to_string(rc));}
-#define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s" + rc, #x); assert(false && #x);}
+#define CHECK_ASSERT(x) if(const int rc = x) {printf("DB Error %i %s\n", rc, #x); assert(false && #x);}
 
 inline
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems)
@@ -327,14 +327,26 @@ int& get_num_dbs()
     return num;
 }
 
+std::string& get_db_location()
+{
+    static std::string str = "./prod_db";
+
+    return str;
+}
+
 void set_num_dbs(int num)
 {
     get_num_dbs() = num;
 }
 
+void set_db_location(const std::string& in)
+{
+    get_db_location() = in;
+}
+
 db_backend& get_db()
 {
-    static db_backend bck("./prod_db", get_num_dbs());
+    static db_backend bck(get_db_location(), get_num_dbs());
 
     return bck;
 }
