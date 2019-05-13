@@ -88,6 +88,8 @@ void db_tests();
 
 void set_num_dbs(int num);
 void set_db_location(const std::string& location);
+void refresh_db();
+
 db_backend& get_db();
 
 #endif // DB_STORAGE_HPP_INCLUDED

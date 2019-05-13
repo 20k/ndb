@@ -365,6 +365,11 @@ void set_db_location(const std::string& in)
     get_db_location() = in;
 }
 
+void refresh_db()
+{
+    get_db() = db_backend(get_db_location(), get_num_dbs());
+}
+
 db_backend& get_db()
 {
     static db_backend bck(get_db_location(), get_num_dbs());
